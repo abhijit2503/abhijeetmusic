@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ABHI — Music Artist</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    :root {
+      --bg: #060606;
+      --surface: #0f0f0f;
+      --accent: #e8ff47;
+      --accent-dim: rgba(232,255,71,0.15);
+      --text: #f0f0f0;
+      --muted: #555;
+      --border: #1a1a1a;
+      --green: #1DB954;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    /* ════════════════════════════
+       CURSOR
+    ════════════════════════════ */
+    .cursor {
+      position: fixed;
+      width: 10px; height: 10px;
+      background: var(--accent);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 99999;
+      transform: translate(-50%,-50%);
+      mix-blend-mode: difference;
+      transition: width .2s, height .2s;
+    }
+    .cursor-ring {
+      position: fixed;
+      width: 38px; height: 38px;
+      border: 1.5px solid rgba(232,255,71,.45);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 99998;
+      transform: translate(-50%,-50%);
+    }
+    body:has(a:hover) .cursor,
+    body:has(button:hover) .cursor { width:22px; height:22px; }
+    body:has(a:hover) .cursor-ring,
+    body:has(button:hover) .cursor-ring { width:64px; height:64px; border-color:var(--accent); }
+    .cursor-ring { transition: width .35s, height .35s, border-color .35s; }
+
+    /* ════════════════════════════
+       SCROLL PROGRESS
+    ════════════════════════════ */
+    .scroll-bar {
+      position: fixed; top:0; left:0;
+      height: 2px; width: 0%;
+      background: var(--accent);
+      z-index: 99997;
+      box-shadow: 0 0 12px rgba(232,255,71,.6);
+      transition: width .08s linear;
+    }
+
+    /* ════════════════════════════
+       CANVAS BG
+    ════════════════════════════ */
+    #bgCanvas {
+      position: fixed; inset:0;
+      width:100%; height:100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ════════════════════════════
+       NOISE
+    ════════════════════════════ */
+    body::before {
+      content:'';
+      position:fixed; inset:0;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events:none; z-index:1; opacity:.45;
+    }
+
+    nav, section, footer, header { position:relative; z-index:2; }
+
+    /* ════════════════════════════
+       NAVBAR
+    ════════════════════════════ */
+    nav {
+      position:fixed; top:0; left:0; right:0;
+      z-index:500;
+      display:flex; justify-content:space-between; align-items:center;
+      padding:1.4rem 4rem;
+      background:rgba(6,6,6,.6);
+      backdrop-filter:blur(24px);
+      border-bottom:1px solid var(--border);
+      transition:background .4s, padding .3s;
+    }
+    nav.scrolled { background:rgba(6,6,6,.95); padding:1rem 4rem; }
+
+    .nav-logo {
+      font-family:'Bebas Neue',sans-serif;
+      font-size:2rem; letter-spacing:7px;
+      color:var(--accent);
+      position:relative;
+      animation:logoPulse 3s ease-in-out infinite;
+    }
+    .nav-logo span { color:#fff; }
+    .nav-logo::after {
+      content:'';
+      position:absolute; bottom:-5px; left:0;
+      height:2px; width:100%;
+      background:linear-gradient(90deg,var(--accent),transparent);
+      animation:lineBreath 3s ease-in-out infinite;
+    }
+    @keyframes logoPulse {
+      0%,100%{ text-shadow:0 0 8px rgba(232,255,71,.3),0 0 24px rgba(232,255,71,.1); }
+      50%    { text-shadow:0 0 20px rgba(232,255,71,.7),0 0 60px rgba(232,255,71,.25),0 0 100px rgba(232,255,71,.1); }
+    }
+    @keyframes lineBreath {
+      0%,100%{ opacity:.4; transform:scaleX(.6); transform-origin:left; }
+      50%    { opacity:1;  transform:scaleX(1);  }
+    }
+
+    .nav-links { display:flex; gap:2.8rem; list-style:none; }
+    .nav-links a {
+      text-decoration:none; color:var(--muted);
+      font-size:.78rem; letter-spacing:3px; text-transform:uppercase;
+      transition:color .3s; position:relative;
+    }
+    .nav-links a::after {
+      content:''; position:absolute; bottom:-4px; left:0;
+      width:0; height:1px; background:var(--accent);
+      transition:width .35s;
+    }
+    .nav-links a:hover { color:var(--accent); }
+    .nav-links a:hover::after { width:100%; }
+
+    /* ════════════════════════════
+       SCROLL REVEAL
+    ════════════════════════════ */
+    .reveal        { opacity:0; transform:translateY(55px); transition:opacity .85s cubic-bezier(.16,1,.3,1), transform .85s cubic-bezier(.16,1,.3,1); }
+    .reveal-left   { opacity:0; transform:translateX(-65px); transition:opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1); }
+    .reveal-right  { opacity:0; transform:translateX(65px);  transition:opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1); }
+    .reveal.visible, .reveal-left.visible, .reveal-right.visible { opacity:1; transform:none; }
+
+    .d1{transition-delay:.08s} .d2{transition-delay:.16s} .d3{transition-delay:.24s}
+    .d4{transition-delay:.32s} .d5{transition-delay:.40s} .d6{transition-delay:.48s}
+    .d7{transition-delay:.56s} .d8{transition-delay:.64s} .d9{transition-delay:.72s}
+    .d10{transition-delay:.80s}
+
+    /* ════════════════════════════
+       HERO
+    ════════════════════════════ */
+    #hero {
+      min-height:100vh;
+      display:grid; grid-template-columns:1fr 1fr;
+      align-items:center;
+      padding:0 4rem; gap:4rem;
+      overflow:hidden;
+    }
+
+    /* big glowing orb */
+    #hero::after {
+      content:''; position:absolute;
+      top:-250px; right:-250px;
+      width:750px; height:750px; border-radius:50%;
+      background:radial-gradient(circle,rgba(232,255,71,.07) 0%,transparent 70%);
+      animation:orbPulse 7s ease-in-out infinite;
+      pointer-events:none;
+    }
+    @keyframes orbPulse {
+      0%,100%{ transform:scale(1); opacity:.5; }
+      50%    { transform:scale(1.25); opacity:1; }
+    }
+
+    .hero-tag {
+      display:inline-block;
+      font-size:.68rem; letter-spacing:4px; text-transform:uppercase;
+      color:var(--accent); border:1px solid var(--accent);
+      padding:.3rem .9rem; margin-bottom:2rem;
+      animation:fadeUp .8s ease both;
+      position:relative; overflow:hidden;
+    }
+    .hero-tag::before {
+      content:''; position:absolute; inset:0;
+      background:var(--accent); opacity:.12;
+      transform:translateX(-100%);
+      animation:tagShine 4s 1.5s ease infinite;
+    }
+    @keyframes tagShine {
+      0%   { transform:translateX(-100%); }
+      25%,100%{ transform:translateX(120%); }
+    }
+
+    .hero-title {
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(5rem,12vw,10rem);
+      line-height:.9; letter-spacing:2px;
+      animation:fadeUp .8s .1s ease both;
+    }
+    .hero-title .accent { color:var(--accent); }
+    .typed-word::after {
+      content:'|'; color:var(--accent);
+      animation:blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    .hero-subtitle {
+      margin-top:2rem; font-size:1rem;
+      color:var(--muted); max-width:380px; line-height:1.85;
+      animation:fadeUp .8s .2s ease both;
+    }
+
+    .hero-btns {
+      margin-top:3rem; display:flex; gap:1rem;
+      animation:fadeUp .8s .3s ease both;
+    }
+
+    .btn-primary {
+      background:var(--accent); color:#000;
+      padding:.9rem 2.5rem;
+      font-family:'DM Sans',sans-serif; font-size:.85rem;
+      font-weight:500; letter-spacing:2px; text-transform:uppercase;
+      border:none; cursor:none; text-decoration:none;
+      transition:transform .25s, box-shadow .25s, background .2s;
+      position:relative; overflow:hidden;
+    }
+    .btn-primary::before {
+      content:''; position:absolute; top:50%; left:50%;
+      width:0; height:0; background:rgba(255,255,255,.25); border-radius:50%;
+      transform:translate(-50%,-50%); transition:width .55s, height .55s;
+    }
+    .btn-primary:hover::before { width:350px; height:350px; }
+    .btn-primary:hover { transform:translateY(-3px); box-shadow:0 12px 40px rgba(232,255,71,.35); background:#d4eb30; }
+
+    .btn-ghost {
+      background:transparent; color:var(--text);
+      padding:.9rem 2.5rem;
+      font-family:'DM Sans',sans-serif; font-size:.85rem;
+      letter-spacing:2px; text-transform:uppercase;
+      border:1px solid var(--border); cursor:none; text-decoration:none;
+      transition:border-color .3s, color .3s, transform .25s;
+    }
+    .btn-ghost:hover { border-color:var(--accent); color:var(--accent); transform:translateY(-3px); }
+
+    /* Hero image */
+    .hero-image {
+      position:relative; display:flex;
+      justify-content:center; align-items:center;
+      animation:fadeUp .8s .25s ease both;
+    }
+    .hero-image-box {
+      width:420px; height:520px;
+      background:linear-gradient(135deg,#1a1a1a,#0a0a0a);
+      border:1px solid var(--border);
+      position:relative; overflow:hidden;
+      transition:transform .45s, box-shadow .45s;
+    }
+    .hero-image-box:hover { transform:translateY(-10px) rotate(1deg); box-shadow:0 40px 100px rgba(232,255,71,.12); }
+    .hero-image-box img { width:100%; height:100%; object-fit:cover; display:block; }
+
+    /* scan line */
+    .hero-image-box::after {
+      content:''; position:absolute; top:-4px; left:0; right:0; height:3px;
+      background:linear-gradient(90deg,transparent,rgba(232,255,71,.5),transparent);
+      animation:scan 4s linear infinite; z-index:3;
+    }
+    @keyframes scan { 0%{top:-4px} 100%{top:100%} }
+
+    .hero-image-box::before {
+      content:''; position:absolute; inset:0;
+      background:linear-gradient(to bottom,transparent 45%,rgba(232,255,71,.06) 100%);
+      z-index:2;
+    }
+
+    .hero-badge {
+      position:absolute; bottom:-1px; left:-1px;
+      background:var(--accent); color:#000;
+      padding:.75rem 1.4rem; font-size:.68rem;
+      letter-spacing:2px; text-transform:uppercase; font-weight:600;
+      z-index:4; animation:badgePulse 2.5s ease-in-out infinite;
+    }
+    @keyframes badgePulse {
+      0%,100%{ box-shadow:0 0 0 0 rgba(232,255,71,.5); }
+      50%    { box-shadow:0 0 0 10px rgba(232,255,71,0); }
+    }
+
+    .floating-label {
+      position:absolute; top:2rem; right:-1.2rem;
+      background:var(--surface); border:1px solid var(--border);
+      padding:1rem 1.5rem; font-size:.72rem; color:var(--muted); letter-spacing:1px;
+      animation:float 5s ease-in-out infinite;
+    }
+    .floating-label strong {
+      display:block; font-family:'Bebas Neue',sans-serif;
+      font-size:1.8rem; color:var(--accent); letter-spacing:2px;
+    }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+
+    @keyframes fadeUp { from{opacity:0;transform:translateY(32px)} to{opacity:1;transform:none} }
+
+    /* ════════════════════════════
+       SECTION COMMON
+    ════════════════════════════ */
+    section { padding:8rem 4rem; }
+    .section-label {
+      font-size:.68rem; letter-spacing:4px; text-transform:uppercase;
+      color:var(--accent); margin-bottom:1rem;
+    }
+    .section-title {
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(3rem,6vw,5rem); letter-spacing:2px; line-height:1;
+      margin-bottom:4rem;
+    }
+
+    /* ════════════════════════════
+       ABOUT
+    ════════════════════════════ */
+    #about {
+      background:var(--surface);
+      border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+    }
+    .about-grid {
+      display:grid; grid-template-columns:1fr 1.4fr;
+      gap:6rem; align-items:center;
+    }
+    .about-stats {
+      display:grid; grid-template-columns:1fr 1fr;
+      gap:2px; margin-top:3rem;
+    }
+    .stat-box {
+      background:var(--bg); padding:2rem;
+      border:1px solid var(--border);
+      position:relative; overflow:hidden;
+      transition:border-color .35s, transform .35s;
+    }
+    .stat-box::before {
+      content:''; position:absolute; inset:0;
+      background:linear-gradient(135deg,rgba(232,255,71,.05),transparent 60%);
+      opacity:0; transition:opacity .35s;
+    }
+    .stat-box:hover { border-color:var(--accent); transform:translateY(-5px); }
+    .stat-box:hover::before { opacity:1; }
+    .stat-number {
+      font-family:'Bebas Neue',sans-serif; font-size:3.5rem;
+      color:var(--accent); letter-spacing:2px; line-height:1;
+    }
+    .stat-label {
+      font-size:.72rem; letter-spacing:2px; text-transform:uppercase;
+      color:var(--muted); margin-top:.3rem;
+    }
+    .about-text p { color:var(--muted); line-height:1.95; font-size:1rem; margin-bottom:1.2rem; }
+    .genre-tags { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:2rem; }
+    .tag {
+      border:1px solid var(--border); padding:.4rem 1rem;
+      font-size:.7rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted);
+      transition:border-color .3s, color .3s, background .3s, transform .2s;
+    }
+    .tag:hover { border-color:var(--accent); color:#000; background:var(--accent); transform:translateY(-2px); }
+
+    /* ════════════════════════════
+       MUSIC
+    ════════════════════════════ */
+    #music { background:var(--bg); }
+
+    .tracks-list { display:flex; flex-direction:column; gap:3px; }
+
+    .track {
+      display:grid;
+      grid-template-columns:3rem 64px 1fr auto auto;
+      align-items:center; gap:1.5rem;
+      padding:1rem 2rem;
+      background:var(--surface); border:1px solid var(--border);
+      text-decoration:none; color:inherit;
+      position:relative; overflow:hidden;
+      transition:background .3s, border-color .3s, transform .35s;
+    }
+    /* left accent bar */
+    .track::before {
+      content:''; position:absolute; left:0; top:0; bottom:0;
+      width:3px; background:var(--accent);
+      transform:scaleY(0); transition:transform .3s cubic-bezier(.16,1,.3,1);
+    }
+    /* shimmer sweep */
+    .track::after {
+      content:''; position:absolute; top:0; left:-100%; width:55%; height:100%;
+      background:linear-gradient(90deg,transparent,rgba(232,255,71,.05),transparent);
+      transition:left .55s; pointer-events:none;
+    }
+    .track:hover::after  { left:150%; }
+    .track:hover { background:#141414; border-color:#2a2a2a; transform:translateX(8px); }
+    .track:hover::before { transform:scaleY(1); }
+
+    .track-num {
+      font-family:'Bebas Neue',sans-serif; font-size:1.2rem;
+      color:var(--muted); text-align:center; transition:color .3s;
+    }
+    .track:hover .track-num { color:var(--accent); }
+
+    .track-cover {
+      width:64px; height:64px; object-fit:cover;
+      border:1px solid var(--border); display:block;
+      transition:transform .35s, box-shadow .35s;
+    }
+    .track:hover .track-cover { transform:scale(1.1) rotate(-2deg); box-shadow:0 10px 28px rgba(0,0,0,.6); }
+
+    .track-info h3 { font-size:1rem; font-weight:500; margin-bottom:.2rem; transition:color .3s; }
+    .track:hover .track-info h3 { color:var(--accent); }
+    .track-info span { font-size:.76rem; color:var(--muted); letter-spacing:1px; }
+
+    .track-duration { font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+
+    .track-spotify {
+      padding:.45rem .9rem;
+      border:1px solid var(--green); color:var(--green);
+      font-size:.7rem; letter-spacing:1.5px; text-transform:uppercase; font-weight:500;
+      white-space:nowrap;
+      transition:background .3s, color .3s, transform .2s, box-shadow .3s;
+    }
+    .track:hover .track-spotify {
+      background:var(--green); color:#000;
+      transform:scale(1.06); box-shadow:0 4px 22px rgba(29,185,84,.35);
+    }
+
+    .track.coming-soon { opacity:.38; pointer-events:none; }
+    .track-coming {
+      padding:.45rem .9rem;
+      border:1px solid var(--muted); color:var(--muted);
+      font-size:.7rem; letter-spacing:1.5px; text-transform:uppercase; font-weight:500;
+      white-space:nowrap;
+    }
+
+    /* ════════════════════════════
+       CONTACT
+    ════════════════════════════ */
+    #contact { background:var(--surface); border-top:1px solid var(--border); }
+    .contact-grid { display:grid; grid-template-columns:1fr 1fr; gap:6rem; }
+    .contact-info p { color:var(--muted); line-height:1.9; margin-bottom:3rem; }
+
+    .social-links { display:flex; flex-direction:column; gap:2px; }
+    .social-link {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:1.2rem 1.5rem; background:var(--bg);
+      border:1px solid var(--border); text-decoration:none; color:var(--text);
+      position:relative; overflow:hidden;
+      transition:border-color .3s, transform .3s, box-shadow .3s;
+    }
+    .social-link::before {
+      content:''; position:absolute; inset:0;
+      background:linear-gradient(90deg,rgba(232,255,71,.07),transparent);
+      transform:translateX(-100%); transition:transform .4s;
+    }
+    .social-link:hover::before { transform:translateX(0); }
+    .social-link:hover { border-color:var(--accent); transform:translateX(8px); box-shadow:-4px 0 24px rgba(232,255,71,.1); }
+    .social-link-name { font-size:.78rem; letter-spacing:2px; text-transform:uppercase; }
+    .social-link-handle { font-size:.76rem; color:var(--muted); }
+    .social-arrow { color:var(--accent); font-size:.9rem; transition:transform .3s; }
+    .social-link:hover .social-arrow { transform:translate(5px,-5px); }
+
+    .contact-form { display:flex; flex-direction:column; gap:1rem; }
+    .form-group { display:flex; flex-direction:column; gap:.4rem; }
+    .form-group label { font-size:.68rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+    .form-group input, .form-group textarea {
+      background:var(--bg); border:1px solid var(--border); color:var(--text);
+      padding:1rem 1.2rem; font-family:'DM Sans',sans-serif; font-size:.9rem; font-weight:300;
+      outline:none; transition:border-color .3s, box-shadow .3s, transform .2s; resize:none;
+    }
+    .form-group input:focus, .form-group textarea:focus {
+      border-color:var(--accent); box-shadow:0 0 0 3px rgba(232,255,71,.08); transform:translateY(-2px);
+    }
+    .form-group textarea { height:130px; }
+
+    .btn-submit {
+      background:var(--accent); color:#000; border:none;
+      padding:1rem 2.2rem; font-family:'DM Sans',sans-serif;
+      font-size:.8rem; font-weight:500; letter-spacing:3px; text-transform:uppercase;
+      cursor:none; margin-top:.5rem; align-self:flex-start;
+      transition:background .2s, transform .25s, box-shadow .25s;
+      position:relative; overflow:hidden;
+    }
+    .btn-submit::before {
+      content:''; position:absolute; top:50%; left:50%;
+      width:0; height:0; background:rgba(0,0,0,.12); border-radius:50%;
+      transform:translate(-50%,-50%); transition:width .45s,height .45s;
+    }
+    .btn-submit:hover::before { width:350px; height:350px; }
+    .btn-submit:hover { background:#cfe630; transform:translateY(-2px); box-shadow:0 10px 30px rgba(232,255,71,.3); }
+
+    /* ════════════════════════════
+       FOOTER
+    ════════════════════════════ */
+    footer {
+      padding:3rem 4rem; border-top:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center;
+      position:relative; z-index:2;
+    }
+    .footer-logo {
+      font-family:'Bebas Neue',sans-serif; font-size:1.5rem;
+      letter-spacing:6px; color:var(--accent);
+      animation:logoPulse 3s ease-in-out infinite;
+    }
+    .footer-logo span { color:#fff; }
+    .footer-copy { font-size:.72rem; color:var(--muted); letter-spacing:1px; }
+
+    /* ════════════════════════════
+       SCROLLBAR
+    ════════════════════════════ */
+    ::-webkit-scrollbar { width:3px; }
+    ::-webkit-scrollbar-track { background:var(--bg); }
+    ::-webkit-scrollbar-thumb { background:#2a2a2a; }
+    ::-webkit-scrollbar-thumb:hover { background:var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="scroll-bar" id="scrollBar"></div>
+  <canvas id="bgCanvas"></canvas>
+
+  <!-- ── NAVBAR ── -->
+  <nav id="navbar">
+    <div class="nav-logo">AB<span>HI</span></div>
+    <ul class="nav-links">
+      <li><a href="#hero">Home</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#music">Music</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+
+  <!-- ── HERO ── -->
+  <section id="hero">
+    <div class="hero-text">
+      <div class="hero-tag">✦ Independent Artist</div>
+      <h1 class="hero-title">
+        Sound<br>is my<br>
+        <span class="accent"><span class="typed-word" id="typedWord"></span></span>
+      </h1>
+      <p class="hero-subtitle">Creating music that moves between worlds — lo-fi beats, raw vocals, and stories that don't fit neatly into any box.</p>
+      <div class="hero-btns">
+        <a href="#music" class="btn-primary">Listen Now</a>
+        <a href="#contact" class="btn-ghost">Get in Touch</a>
+      </div>
+    </div>
+    <div class="hero-image">
+      <div class="hero-image-box">
+        <img src="assets/images/myphoto.jpg" alt="Abhi"/>
+        <div class="hero-badge">Available for Collabs</div>
+      </div>
+      <div class="floating-label">
+        <strong>40+</strong>
+        Songs Released
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ABOUT ── -->
+  <section id="about">
+    <p class="section-label reveal">✦ Who I Am</p>
+    <div class="about-grid">
+      <div class="reveal-left">
+        <h2 class="section-title">The<br>Artist<br>Behind<br>The Sound.</h2>
+        <div class="about-stats">
+          <div class="stat-box reveal d1"><div class="stat-number">50K</div><div class="stat-label">Monthly Listeners</div></div>
+          <div class="stat-box reveal d2"><div class="stat-number">40+</div><div class="stat-label">Songs Released</div></div>
+          <div class="stat-box reveal d3"><div class="stat-number">2</div><div class="stat-label">Albums Out</div></div>
+          <div class="stat-box reveal d4"><div class="stat-number">2025</div><div class="stat-label">Active Since</div></div>
+        </div>
+      </div>
+      <div class="about-text reveal-right">
+        <p>Hey, I'm Abhi — a songwriter and producer based out of Pune. Music has been my language since I was 12, when I first picked up a guitar and realised I could say things with a chord that I couldn't say with words.</p>
+        <p>My sound sits somewhere between lo-fi R&B, indie pop, and raw acoustic energy. I write about love, loss, late nights, and everything in between — the stuff nobody talks about at the dinner table.</p>
+        <p>I've played at indie festivals, collaborated with producers across India and abroad, and I'm always working on something new. If my music finds you at the right moment — that's everything to me.</p>
+        <div class="genre-tags">
+          <span class="tag">Lo-Fi</span>
+          <span class="tag">R&B</span>
+          <span class="tag">Indie Pop</span>
+          <span class="tag">Acoustic</span>
+          <span class="tag">House Music</span>
+          <span class="tag">Singer-Songwriter</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MUSIC ── -->
+  <section id="music">
+    <p class="section-label reveal">✦ Discography</p>
+    <h2 class="section-title reveal">My Songs.</h2>
+    <div class="tracks-list">
+
+      <a class="track reveal d1" href="https://open.spotify.com/album/7yOOmacFzCteTqBBvTj1cY?si=CWdgXm0cTUedzhsxtKHjLA" target="_blank" rel="noopener">
+        <div class="track-num">01</div>
+        <img class="track-cover" src="assets/images/afterhours.png" alt="After Hours">
+        <div class="track-info"><h3>After Hours</h3><span>Album — 2025</span></div>
+        <div class="track-duration">26:29</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal d2" href="https://open.spotify.com/album/HUSTLE_LINK" target="_blank" rel="noopener">
+        <div class="track-num">02</div>
+        <img class="track-cover" src="assets/images/hustle.png" alt="Hustle">
+        <div class="track-info"><h3>Hustle</h3><span>Album — 10 songs — 2025</span></div>
+        <div class="track-duration">38:33</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal d3" href="https://open.spotify.com/track/19oIq6oH6tVsSM4jkp2EMQ?si=63ef13b49dcb4497" target="_blank" rel="noopener">
+        <div class="track-num">03</div>
+        <img class="track-cover" src="assets/images/lost in maze.png" alt="Lost in Maze">
+        <div class="track-info"><h3>Lost in Maze</h3><span>Single — 2025</span></div>
+        <div class="track-duration">2:56</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal d4" href="https://open.spotify.com/track/7E9TrKtqc6waLfiqWf0cMd?si=4b430a2b6a4b48d5" target="_blank" rel="noopener">
+        <div class="track-num">04</div>
+        <img class="track-cover" src="assets/images/about me.png" alt="About Me">
+        <div class="track-info"><h3>About Me</h3><span>Single — 2025</span></div>
+        <div class="track-duration">4:48</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal d5" href="https://open.spotify.com/track/2l7PlBjwjFcZd9RLpIwfo5?si=1693e8bddaa841b6" target="_blank" rel="noopener">
+        <div class="track-num">05</div>
+        <img class="track-cover" src="assets/images/black bass.png" alt="Black Bass">
+        <div class="track-info"><h3>Black Bass</h3><span>Single — 2025</span></div>
+        <div class="track-duration">1:38</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal d6" href="https://open.spotify.com/track/4GRf7hZismuPR1fnMW3pml?si=d67e7e35edb14e8d" target="_blank" rel="noopener">
+        <div class="track-num">06</div>
+        <img class="track-cover" src="assets/images/broccoli.png" alt="Broccoli">
+        <div class="track-info"><h3>Broccoli</h3><span>Single — 2025</span></div>
+        <div class="track-duration">2:30</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal d7" href="https://open.spotify.com/track/0FNIwDnZfl3euw7Kq75E6p?si=53f725e223334b4d" target="_blank" rel="noopener">
+        <div class="track-num">07</div>
+        <img class="track-cover" src="assets/images/less.png" alt="Less">
+        <div class="track-info"><h3>Less</h3><span>Single — 2025</span></div>
+        <div class="track-duration">1:59</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal d8" href="https://open.spotify.com/track/6BevYCi62W15A3PEJbXNGl?si=5f9d821184b04fd3" target="_blank" rel="noopener">
+        <div class="track-num">08</div>
+        <img class="track-cover" src="assets/images/million dollars baby.png" alt="Million Dollar Baby">
+        <div class="track-info"><h3>Million Dollar Baby</h3><span>Single — 2025</span></div>
+        <div class="track-duration">2:36</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal d9" href="https://open.spotify.com/track/0NWA2onm4XWhSJOYQaLL15?si=ff3d890f54934202" target="_blank" rel="noopener">
+        <div class="track-num">09</div>
+        <img class="track-cover" src="assets/images/TOMA.png" alt="TOMA">
+        <div class="track-info"><h3>TOMA (Instrumental)</h3><span>Single — 2025</span></div>
+        <div class="track-duration">0:51</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal d10" href="https://open.spotify.com/track/4pzBINlR1SZf5vHktkoKKt?si=c6a5989fc398438b" target="_blank" rel="noopener">
+        <div class="track-num">10</div>
+        <img class="track-cover" src="assets/images/samurai.png" alt="Samurai">
+        <div class="track-info"><h3>Samurai</h3><span>Single — 2025</span></div>
+        <div class="track-duration">2:18</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <a class="track reveal" href="https://open.spotify.com/track/1ioPeVAqnRkup7UwiiNJFN?si=18e1fe7daac3404a" target="_blank" rel="noopener">
+        <div class="track-num">11</div>
+        <img class="track-cover" src="assets/images/TV OFF.png" alt="TV OFF">
+        <div class="track-info"><h3>TV OFF</h3><span>Single — 2025</span></div>
+        <div class="track-duration">3:46</div>
+        <div class="track-spotify">▶ Play on Spotify</div>
+      </a>
+
+      <!-- Coming soon -->
+      <a class="track coming-soon">
+        <div class="track-num">12</div>
+        <img class="track-cover" src="assets/images/dont cry.png" alt="Don't Cry">
+        <div class="track-info"><h3>Don't Cry</h3><span>Single — Coming Soon</span></div>
+        <div class="track-duration">—</div>
+        <div class="track-coming">⏳ Coming Soon</div>
+      </a>
+
+      <a class="track coming-soon">
+        <div class="track-num">13</div>
+        <img class="track-cover" src="assets/images/oasis.png" alt="Oasis">
+        <div class="track-info"><h3>Oasis</h3><span>Single — Coming Soon</span></div>
+        <div class="track-duration">—</div>
+        <div class="track-coming">⏳ Coming Soon</div>
+      </a>
+
+      <a class="track coming-soon">
+        <div class="track-num">14</div>
+        <img class="track-cover" src="assets/images/conspirasacy.png" alt="Conspiracy">
+        <div class="track-info"><h3>Conspiracy</h3><span>Single — Coming Soon</span></div>
+        <div class="track-duration">—</div>
+        <div class="track-coming">⏳ Coming Soon</div>
+      </a>
+
+    </div>
+  </section>
+
+  <!-- ── CONTACT ── -->
+  <section id="contact">
+    <p class="section-label reveal">✦ Let's Connect</p>
+    <h2 class="section-title reveal">Say Hello.</h2>
+    <div class="contact-grid">
+      <div class="contact-info reveal-left">
+        <p>Whether you want to collaborate, or just tell me a song meant something to you — my inbox is always open. I read every message.</p>
+        <div class="social-links">
+          <a href="#" class="social-link">
+            <span class="social-link-name">Instagram</span>
+            <span class="social-link-handle">@abhijeetkambleofficial</span>
+            <span class="social-arrow">↗</span>
+          </a>
+          <a href="https://open.spotify.com/album/7yOOmacFzCteTqBBvTj1cY" target="_blank" class="social-link">
+            <span class="social-link-name">Spotify</span>
+            <span class="social-link-handle">Abhi Official</span>
+            <span class="social-arrow">↗</span>
+          </a>
+          <a href="#" class="social-link">
+            <span class="social-link-name">YouTube</span>
+            <span class="social-link-handle">@abhijeetkambleofficial</span>
+            <span class="social-arrow">↗</span>
+          </a>
+        </div>
+      </div>
+      <div class="reveal-right">
+        <form class="contact-form" onsubmit="handleSubmit(event)">
+          <div class="form-group">
+            <label>Your Name</label>
+            <input type="text" placeholder="e.g. Riya Sharma" required/>
+          </div>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" placeholder="you@example.com" required/>
+          </div>
+          <div class="form-group">
+            <label>Message</label>
+            <textarea placeholder="Hey Abhi, I wanted to say..."></textarea>
+          </div>
+          <button type="submit" class="btn-submit">Send Message →</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="footer-logo">AB<span>HI</span></div>
+    <div class="footer-copy">© 2025 Abhi. Made with music & code.</div>
+  </footer>
+
+  <script>
+    // ── CURSOR ──
+    const cursor = document.getElementById('cursor');
+    const ring   = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      cursor.style.left = mx+'px'; cursor.style.top = my+'px';
+    });
+    (function animRing(){
+      rx += (mx-rx)*0.13; ry += (my-ry)*0.13;
+      ring.style.left = rx+'px'; ring.style.top = ry+'px';
+      requestAnimationFrame(animRing);
+    })();
+
+    // ── SCROLL BAR + NAV ──
+    const bar = document.getElementById('scrollBar');
+    const nav = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      const pct = window.scrollY / (document.body.scrollHeight - innerHeight) * 100;
+      bar.style.width = pct + '%';
+      nav.classList.toggle('scrolled', window.scrollY > 60);
+    });
+
+    // ── PARTICLE CANVAS ──
+    const canvas = document.getElementById('bgCanvas');
+    const ctx    = canvas.getContext('2d');
+    const resize = () => { canvas.width=innerWidth; canvas.height=innerHeight; };
+    resize(); window.addEventListener('resize', resize);
+
+    const pts = Array.from({length:90}, () => ({
+      x: Math.random()*innerWidth,
+      y: Math.random()*innerHeight,
+      r: Math.random()*1.4+0.3,
+      dx:(Math.random()-.5)*.45,
+      dy:(Math.random()-.5)*.45,
+      o: Math.random()*.45+.1
+    }));
+
+    (function drawPts(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      pts.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(232,255,71,${p.o})`;
+        ctx.fill();
+        p.x+=p.dx; p.y+=p.dy;
+        if(p.x<0||p.x>canvas.width) p.dx*=-1;
+        if(p.y<0||p.y>canvas.height) p.dy*=-1;
+      });
+      for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){
+        const d = Math.hypot(pts[i].x-pts[j].x, pts[i].y-pts[j].y);
+        if(d<130){
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[j].x,pts[j].y);
+          ctx.strokeStyle=`rgba(232,255,71,${.07*(1-d/130)})`;
+          ctx.lineWidth=.5; ctx.stroke();
+        }
+      }
+      requestAnimationFrame(drawPts);
+    })();
+
+    // ── TYPING EFFECT ──
+    const words = ['Soul.','Life.','Voice.','World.','Art.'];
+    let wi=0, ci=0, del=false;
+    const tw = document.getElementById('typedWord');
+    (function type(){
+      const w = words[wi];
+      if(!del){ tw.textContent = w.slice(0,++ci); if(ci===w.length){del=true;setTimeout(type,2000);return;} }
+      else     { tw.textContent = w.slice(0,--ci); if(ci===0){del=false;wi=(wi+1)%words.length;} }
+      setTimeout(type, del?55:115);
+    })();
+
+    // ── SCROLL REVEAL ──
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+    }, {threshold:0.09});
+    document.querySelectorAll('.reveal,.reveal-left,.reveal-right').forEach(el=>obs.observe(el));
+
+    // ── FORM ──
+    function handleSubmit(e){
+      e.preventDefault();
+      const btn = e.target.querySelector('.btn-submit');
+      btn.textContent='Message Sent ✓'; btn.style.background='#4ade80';
+      setTimeout(()=>{ btn.textContent='Send Message →'; btn.style.background=''; },3000);
+    }
+  </script>
+</body>
+</html>
